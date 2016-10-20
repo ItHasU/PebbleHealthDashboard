@@ -1,17 +1,19 @@
 #!/usr/bin/python2
 #-*- coding: utf-8 -*-
 
+import sqlite3, json
+
 #-- Database part -------------------------------------------------------------
 
 class HealthDatabase:
     def __init__(self, filename="health.db"):
-        import sqlite3
         self.db = sqlite3.connect(filename)
         c = self.db.cursor()
         c.execute('''CREATE TABLE IF NOT EXISTS health (user text, date text, steps integer, heartrate integer, mask integer)''')
         c.execute('''CREATE UNIQUE INDEX IF NOT EXISTS user_date ON health (user, date);''')
 
     def push(self, line, userId=""):
+        print(line)
         # Parse line
         try:
             values = line.split(",")
@@ -39,6 +41,19 @@ class HealthDatabase:
 
     def get_by_day(self, userId = ""):
         return self.get_by_format('%Y-%m-%d', userId)
+    
+    def get_by_day_json(self, userId=''):
+        c = self.db.cursor()
+        steps = []
+        heartrate = []
+        c.execute("SELECT strftime('%s', date), SUM(steps), AVG(heartrate) FROM health WHERE user=? GROUP BY strftime('%Y-%m-%d', date)", (userId,))
+        while True:
+            r = c.fetchone()
+            if not r:
+                break
+            steps.append([int(r[0])*1000, r[1]])
+            heartrate.append([int(r[0])*1000, r[2]])
+        return json.dumps({"steps": steps, "heartrate": heartrate})
 
     def get_by_week(self, userId = ""):
         return self.get_by_format('%Y-%W', userId)
@@ -58,9 +73,9 @@ from sys import version as python_version
 from cgi import parse_header, parse_multipart
 from urlparse import parse_qs
 from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
-import datetime
+import SimpleHTTPServer
 
-class HealthRequestHandler(BaseHTTPRequestHandler):
+class HealthRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
 
     def _set_headers(self, content_type="application/json"):
         self.send_response(200)
@@ -81,18 +96,26 @@ class HealthRequestHandler(BaseHTTPRequestHandler):
         return postvars
 
     def do_POST(self):
+        global db
         self._set_headers()
         postvars = self.parse_POST()
         # We don't care about key, just get all
         for v in postvars.values():
             for line in v[0].split('|'):
-                instantStr, steps, yaw, pitch, vmc, light, mask = line.split(',')
-                instant = datetime.datetime.strptime(instantStr, '%Y-%m-%dT%H:%M:%SZ')
-                print instant, steps, mask
+                db.push(line)
         # Terminate
-        self.wfile.write("{}\n")
+        self.wfile.write("{}")
         self.wfile.close()
         return
+
+    def do_GET(self):
+        global db
+        if self.path == "/api/data":
+            self._set_headers()
+            self.wfile.write(db.get_by_day_json())
+            self.wfile.close()
+        else:
+            return SimpleHTTPServer.SimpleHTTPRequestHandler.do_GET(self)
 
 #-- Script --------------------------------------------------------------------
 
@@ -115,7 +138,14 @@ def script_insert(csv_filename, db_filename):
 if __name__ == "__main__":
     import sys
     #script_insert("data.csv", "health.db")
+    global db
     db = HealthDatabase()
+
+    server = HTTPServer(("", 5000), HealthRequestHandler)
+    server.serve_forever()
+
+    db.close()
+    exit(0)
 
     c = db.get_by_day()
     while True:
@@ -131,4 +161,3 @@ if __name__ == "__main__":
             break
         print r
 
-    db.close()
