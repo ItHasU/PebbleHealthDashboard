@@ -1,3 +1,4 @@
+/*
 $(function () {
     $('#chart-week').highcharts({
         chart: {
@@ -86,7 +87,7 @@ $(function () {
     });
 });
 
-
+*/
 
 
 
