@@ -87,15 +87,6 @@ $(function () {
     });
 });
 
-*/
-
-
-
-
-
-
-
-
 
 $(function () {
     // Create the chart
@@ -152,6 +143,7 @@ $(function () {
         }]
     });
 });
+*/
 
 
 $(function () {
