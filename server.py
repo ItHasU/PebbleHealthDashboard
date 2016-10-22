@@ -39,14 +39,11 @@ class HealthDatabase:
         c.execute("SELECT * FROM health WHERE user=?", (userId,))
         return c
 
-    def get_by_day(self, userId = ""):
-        return self.get_by_format('%Y-%m-%d', userId)
-    
-    def get_by_day_json(self, userId=''):
+    def get_steps_by_day_json(self, userId=''):
         c = self.db.cursor()
         steps = []
         heartrate = []
-        c.execute("SELECT strftime('%s', date), SUM(steps), AVG(heartrate) FROM health WHERE user=? GROUP BY strftime('%Y-%m-%d', date)", (userId,))
+        c.execute("SELECT strftime('%s', date, 'localtime'), SUM(steps), AVG(heartrate) FROM health WHERE user=? GROUP BY strftime('%Y-%m-%d', date, 'localtime')", (userId,))
         while True:
             r = c.fetchone()
             if not r:
@@ -54,6 +51,17 @@ class HealthDatabase:
             steps.append([int(r[0])*1000, r[1]])
             heartrate.append([int(r[0])*1000, r[2]])
         return json.dumps({"steps": steps, "heartrate": heartrate})
+
+    def get_sleep_by_day_json(self, userId=''):
+        c = self.db.cursor()
+        sleep = []
+        c.execute("""SELECT strftime('%s', date, 'localtime'), COUNT(*) FROM health WHERE user=? AND (mask = 3 OR mask = 1) GROUP BY strftime('%Y-%m-%d', date, '+12 hours', 'localtime')""", (userId,))
+        while True:
+            r = c.fetchone()
+            if not r:
+                break
+            sleep.append([int(r[0])*1000, r[1]])
+        return json.dumps({"sleep": sleep})
 
     def get_by_week(self, userId = ""):
         return self.get_by_format('%Y-%W', userId)
@@ -112,7 +120,11 @@ class HealthRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         global db
         if self.path == "/api/data":
             self._set_headers()
-            self.wfile.write(db.get_by_day_json())
+            self.wfile.write(db.get_steps_by_day_json())
+            self.wfile.close()
+        elif self.path == "/api/data2":
+            self._set_headers()
+            self.wfile.write(db.get_sleep_by_day_json())
             self.wfile.close()
         else:
             return SimpleHTTPServer.SimpleHTTPRequestHandler.do_GET(self)

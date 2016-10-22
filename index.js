@@ -148,7 +148,7 @@ $(function () {
 
 $(function () {
     $.getJSON("/api/data", function(raw_data) {
-        $('#chart-full-day').highcharts({
+        $('#chart-steps-full-day').highcharts({
             chart: {
                 zoomType: 'x'
             },
@@ -185,6 +185,52 @@ $(function () {
                 name: 'Steps per day',
                 data: raw_data.steps
             }]
+        });
+    });
+
+    $.getJSON("/api/data2", function(raw_data) {
+        $('#chart-sleep-full-day').highcharts({
+            chart: {
+                zoomType: 'x'
+            },
+            title: {
+                text: 'Minutes of sleep per day - Full history'
+            },
+            xAxis: {
+                type: 'datetime'
+            },
+            yAxis: {
+                title: {
+                    text: 'Minutes'
+                }
+            },
+            legend: {
+                enabled: false
+            },
+            plotOptions: {
+                area: {
+                    marker: {
+                        radius: 2
+                    },
+                    lineWidth: 1,
+                    states: {
+                        hover: {
+                            lineWidth: 1
+                        }
+                    },
+                    threshold: null
+                }
+            },
+            series: [{
+                type: 'area',
+                name: 'Minutes of sleep per day',
+                data: raw_data.sleep
+            }],
+            tooltip: {
+                formatter: function() {
+                    return Math.floor(this.y / 60) + ":" + (this.y % 60 < 10 ? "0" : "") + (this.y % 60) + ' minutes of sleep on ' + new Date(this.x).toDateString();
+                }
+            }
         });
     });
 });
